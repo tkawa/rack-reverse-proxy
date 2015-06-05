@@ -89,19 +89,15 @@ module Rack
 
       # Modify response
       if response_headers.include?('content-encoding') && response_headers['content-encoding'].include?('gzip')
+        response_headers['content-encoding'].delete('gzip')
         response_body = ''
         modify_response_headers(response_headers, matcher)
         body_expanded = StringIO.open(target_response.body.to_s, 'rb') do |sio|
           Zlib::GzipReader.wrap(sio).read
         end
         body_modified = modify_response_body(body_expanded, matcher)
-        StringIO.open(response_body, 'r+b') do |sio|
-          Zlib::GzipWriter.wrap(sio) do |gz|
-            gz.write(body_modified)
-          end
-        end
-        response_headers['content-length'] = [response_body.bytesize.to_s]
-        response_body = [response_body]
+        response_headers['content-length'] = [body_modified.bytesize.to_s]
+        response_body = [body_modified]
       else
         response_body = target_response.body
       end
