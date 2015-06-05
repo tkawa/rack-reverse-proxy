@@ -54,6 +54,9 @@ module Rack
         target_request_headers['X-Forwarded-Port'] = "#{source_request.port}"
       end
 
+      # Modify request headers
+      modify_request_headers(target_request_headers, matcher)
+
       target_request.initialize_http_header(target_request_headers)
 
       # Basic auth
@@ -84,7 +87,26 @@ module Rack
         response_headers['location'] = response_location.to_s
       end
 
-      [target_response.status, response_headers, target_response.body]
+      # Modify response
+      if response_headers.include?('content-encoding') && response_headers['content-encoding'].include?('gzip')
+        response_body = ''
+        modify_response_headers(response_headers, matcher)
+        body_expanded = StringIO.open(target_response.body.to_s, 'rb') do |sio|
+          Zlib::GzipReader.wrap(sio).read
+        end
+        body_modified = modify_response_body(body_expanded, matcher)
+        StringIO.open(response_body, 'r+b') do |sio|
+          Zlib::GzipWriter.wrap(sio) do |gz|
+            gz.write(body_modified)
+          end
+        end
+        response_headers['content-length'] = [response_body.bytesize.to_s]
+        response_body = [response_body]
+      else
+        response_body = target_response.body
+      end
+
+      [target_response.status, response_headers, response_body]
     end
 
     def extract_http_request_headers(env)
@@ -128,6 +150,19 @@ module Rack
     def reverse_proxy(matcher, url=nil, opts={})
       raise GenericProxyURI.new(url) if matcher.is_a?(String) && url.is_a?(String) && URI(url).class == URI::Generic
       @matchers << ReverseProxyMatcher.new(matcher,url,opts)
+    end
+
+    def modify_request_headers(headers)
+      # should be overrided
+    end
+
+    def modify_response_headers(response_headers)
+      # should be overrided
+    end
+
+    def modify_response_body(body)
+      # should be overrided
+      body
     end
   end
 end
