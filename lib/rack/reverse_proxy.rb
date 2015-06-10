@@ -88,20 +88,26 @@ module Rack
       end
 
       # Modify response
+      target_response_body = target_response.body.to_s
       if response_headers.include?('content-encoding') && response_headers['content-encoding'].include?('gzip')
-        response_headers['content-encoding'].delete('gzip')
+        response_headers.delete('content-encoding')
         response_body = ''
         modify_response_headers(response_headers, matcher)
-        body_expanded = StringIO.open(target_response.body.to_s, 'rb') do |sio|
+        body_expanded = StringIO.open(target_response_body, 'rb') do |sio|
           Zlib::GzipReader.wrap(sio).read
         end
         body_modified = modify_response_body(body_expanded, matcher)
-        response_headers['content-length'] = [body_modified.bytesize.to_s]
+        response_headers.delete('content-length')
+        # response_headers['content-length'] = [body_modified.bytesize.to_s]
+        response_body = [body_modified]
+      elsif !target_response_body.empty?
+        modify_response_headers(response_headers, matcher)
+        body_modified = modify_response_body(target_response_body, matcher)
+        response_headers.delete('content-length')
         response_body = [body_modified]
       else
-        response_body = target_response.body
+        response_body = []
       end
-
       [target_response.status, response_headers, response_body]
     end
 
