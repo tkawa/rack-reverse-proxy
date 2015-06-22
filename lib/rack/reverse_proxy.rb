@@ -69,7 +69,11 @@ module Rack
       end
 
       target_request.content_length = source_request.content_length || 0
-      target_request.content_type   = source_request.content_type if source_request.content_type
+      if target_request.content_length > 0
+        target_request.content_type   = 'application/json'
+      elsif source_request.content_type
+        target_request.content_type   = source_request.content_type
+      end
 
       # Create a streaming response (the actual network communication is deferred, a.k.a. streamed)
       target_response = HttpStreamingResponse.new(target_request, uri.host, uri.port)
